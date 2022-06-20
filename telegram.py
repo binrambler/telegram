@@ -5,7 +5,6 @@ import pandas as pd
 import pathlib
 
 TOKEN = '5493895594:AAHa3N_cAkS_A3QEi252m0d4m05y3P03TuY'
-
 DIR_PHOTO = pathlib.Path('//z2/base/ftp/foto')
 SERVER = '192.168.20.5'
 DATABASE = 'IZH_SQL_2018'
@@ -16,14 +15,15 @@ PASSWORD = ''
 bot = Bot(token=TOKEN)
 dp = Dispatcher(bot)
 
+# создаем клавиатуру
 keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
 buttons = ['Колготки и белье', 'Общий прайс']
 for button in buttons:
     keyboard.add(button)
 
-
-def exec_query(sgi_str):
-    qry = f'select * from dbo.BOT (nolock) where SGI_CODE {sgi_str}'
+# вытягиваем запросом инфу
+def exec_query(where_str):
+    qry = f'select * from dbo.BOT (nolock) where SGI_CODE {where_str}'
     with pyodbc.connect('DRIVER={SQL Server};SERVER=' + SERVER +
                         ';DATABASE=' + DATABASE +
                         ';UID=' + USERNAME +
@@ -35,25 +35,32 @@ async def cmd_start(message: types.Message):
     if message.text == buttons[0]:
         arr = exec_query("in ('7')")
     elif message.text == buttons[1]:
-        arr = exec_query("in ('1')")
+        arr = exec_query("not in ('7')")
     else:
         await message.answer('Какие новинки вам показать?', reply_markup=keyboard)
         return 0
 
-    # await asyncio.sleep(1)
-    await types.ChatActions.upload_photo()
+    # для красоты имитируем отправку фото
+    await types.ChatActions.upload_photo(1)
 
     for _, row in arr.iterrows():
         photo01 = pathlib.Path(DIR_PHOTO, row['PHOTO01'])
         photo02 = pathlib.Path(DIR_PHOTO, row['PHOTO02'])
 
+        # создаем сообщение с двумя фото
         media = types.MediaGroup()
-        media_txt = f"{row['MODEL_DESCR'].strip()}, *{row['PRICE']:.2f}* \u20bd"
-        if photo01.exists():
-            media.attach_photo(types.InputFile(photo01), caption=media_txt, parse_mode='Markdown')
-            if photo02.exists():
-                media.attach_photo(types.InputFile(photo02))
+        media_txt = f"{row['MODEL_DESCR'].strip()}" \
+                    f"\n*{row['PRICE']:.2f}* \u20bd" \
+                    f"\n{row['INGRID'].strip()}" \
+                    f"\n{row['COMMENT'].strip()}"
 
+        # если фото существет, то прикрепляем его к сообщению
+        if photo01.exists():
+            media.attach_photo(photo=types.InputFile(photo01), caption=media_txt, parse_mode='Markdown')
+            if photo02.exists():
+                media.attach_photo(photo=types.InputFile(photo02))
+
+        # если есть хотя бы одно фото, то выводим сообщение
         if media.media:
             await bot.send_media_group(chat_id=message.chat.id, media=media)
         else:
