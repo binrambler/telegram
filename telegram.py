@@ -42,7 +42,7 @@ def exec_query(where_str):
 
 
 # команда старт и кнопка назад из новинок в главное меню
-@dp.message_handler(lambda message: message.text in ['/start', butt_news[2]])
+@dp.message_handler(lambda message: message.text in ['/start', butt_news[-1]])
 async def send_message(message: types.Message):
     await message.answer('Что вам показать?', reply_markup=menu_main)
 
