@@ -23,6 +23,7 @@ buttons = ['Колготки и белье', 'Общий прайс']
 for button in buttons:
     keyboard.add(button)
 
+
 # вытягиваем запросом инфу
 def exec_query(where_str):
     qry = f'select top {MAX_MESSAGE} * from dbo.BOT (nolock) where SGI_CODE {where_str}'
@@ -31,6 +32,7 @@ def exec_query(where_str):
                         ';UID=' + USERNAME +
                         ';PWD=' + PASSWORD) as conn:
         return pd.read_sql(qry, conn)
+
 
 @dp.message_handler()
 async def cmd_start(message: types.Message):
@@ -43,12 +45,13 @@ async def cmd_start(message: types.Message):
         return 0
 
     # для красоты имитируем отправку фото
-    await types.ChatActions.upload_photo(1)
+    await asyncio.sleep(1)
+    await types.ChatActions.upload_photo(2)
 
     for _, row in arr.iterrows():
-        photo01 = pathlib.Path(DIR_PHOTO, row['PHOTO01'])
-        photo02 = pathlib.Path(DIR_PHOTO, row['PHOTO02'])
-
+        # телеграм позволяет отправлять 30 сообщений в сек,
+        # поэтому введем принудительную паузу
+        await asyncio.sleep(0.1)
         # создаем сообщение с двумя фото
         media = types.MediaGroup()
         media_txt = f"{row['MODEL_DESCR'].strip()}" \
@@ -56,7 +59,10 @@ async def cmd_start(message: types.Message):
                     f"\n{row['INGRID'].strip()}" \
                     f"\n{row['COMMENT'].strip()}"
 
-        # если фото существет, то прикрепляем его к сообщению
+        photo01 = pathlib.Path(DIR_PHOTO, row['PHOTO01'].strip())
+        photo02 = pathlib.Path(DIR_PHOTO, row['PHOTO02'].strip())
+
+        # если файл фото существет, то прикрепляем его к сообщению
         if photo01.suffix == '.jpg' and photo01.exists():
             media.attach_photo(photo=types.InputFile(photo01), caption=media_txt, parse_mode='Markdown')
             if photo02.suffix == '.jpg' and photo02.exists():
@@ -65,6 +71,7 @@ async def cmd_start(message: types.Message):
         # если есть хотя бы одно фото, то выводим сообщение с фото
         if media.media:
             await bot.send_media_group(chat_id=message.chat.id, media=media)
+        # если фото нет, то просто текст
         else:
             await bot.send_message(chat_id=message.chat.id, text=media_txt, parse_mode='Markdown')
 
