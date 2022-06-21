@@ -41,15 +41,17 @@ def exec_query(where_str):
         return pd.read_sql(qry, conn)
 
 
-# старт и назад из новинок в главное меню
+# команда старт и кнопка назад из новинок в главное меню
 @dp.message_handler(lambda message: message.text in ['/start', butt_news[2]])
 async def send_message(message: types.Message):
     await message.answer('Что вам показать?', reply_markup=menu_main)
+
 
 # показываем меню новинок
 @dp.message_handler(lambda message: message.text == butt_main[0])
 async def send_message(message: types.Message):
     await message.answer('Выберите новинки?', reply_markup=menu_news)
+
 
 # выбираем что-то из меню новинок
 @dp.message_handler(lambda message: message.text != butt_news[-1])
