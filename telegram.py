@@ -18,10 +18,17 @@ bot = Bot(token=TOKEN)
 dp = Dispatcher(bot)
 
 # создаем клавиатуру
-keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
-buttons = ['Колготки и белье', 'Общий прайс']
-for button in buttons:
-    keyboard.add(button)
+# главное меню
+menu_main = types.ReplyKeyboardMarkup(resize_keyboard=True)
+butt_main = ['Новинки']
+for butt in butt_main:
+    menu_main.add(butt)
+
+# меню новинок
+menu_news = types.ReplyKeyboardMarkup(resize_keyboard=True)
+butt_news = ['Колготки и белье', 'Общий прайс', '<< Назад']
+for butt in butt_news:
+    menu_news.add(butt)
 
 
 # вытягиваем запросом инфу
@@ -34,15 +41,27 @@ def exec_query(where_str):
         return pd.read_sql(qry, conn)
 
 
-@dp.message_handler()
-async def cmd_start(message: types.Message):
-    if message.text == buttons[0]:
+# старт и назад из новинок в главное меню
+@dp.message_handler(lambda message: message.text in ['/start', butt_news[2]])
+async def send_message(message: types.Message):
+    await message.answer('Что вам показать?', reply_markup=menu_main)
+
+# показываем меню новинок
+@dp.message_handler(lambda message: message.text == butt_main[0])
+async def send_message(message: types.Message):
+    await message.answer('Выберите новинки?', reply_markup=menu_news)
+
+# выбираем что-то из меню новинок
+@dp.message_handler(lambda message: message.text != butt_news[-1])
+async def send_message(message: types.Message):
+    if message.text == butt_news[0]:
         arr = exec_query("in ('7', '72', '73', '8')")
-    elif message.text == buttons[1]:
+    elif message.text == butt_news[1]:
         arr = exec_query("not in ('7', '72', '73', '8')")
-    else:
-        await message.answer('Какие новинки вам показать?', reply_markup=keyboard)
-        return 0
+
+    if len(arr) == 0:
+        await bot.send_message(chat_id=message.chat.id, text='Новинок нет')
+        return True
 
     # для красоты имитируем отправку фото
     await asyncio.sleep(1)
@@ -55,7 +74,7 @@ async def cmd_start(message: types.Message):
         # создаем сообщение с двумя фото
         media = types.MediaGroup()
         media_txt = f"{row['MODEL_DESCR'].strip()}" \
-                    f"\n*{row['PRICE']:.2f}* \u20bd" \
+                    f"\n<b>{row['PRICE']:.2f}</b> \u20bd" \
                     f"\n{row['INGRID'].strip()}" \
                     f"\n{row['COMMENT'].strip()}"
 
@@ -64,7 +83,7 @@ async def cmd_start(message: types.Message):
 
         # если файл фото существет, то прикрепляем его к сообщению
         if photo01.suffix == '.jpg' and photo01.exists():
-            media.attach_photo(photo=types.InputFile(photo01), caption=media_txt, parse_mode='Markdown')
+            media.attach_photo(photo=types.InputFile(photo01), caption=media_txt, parse_mode=types.ParseMode.HTML)
             if photo02.suffix == '.jpg' and photo02.exists():
                 media.attach_photo(photo=types.InputFile(photo02))
 
@@ -73,7 +92,7 @@ async def cmd_start(message: types.Message):
             await bot.send_media_group(chat_id=message.chat.id, media=media)
         # если фото нет, то просто текст
         else:
-            await bot.send_message(chat_id=message.chat.id, text=media_txt, parse_mode='Markdown')
+            await bot.send_message(chat_id=message.chat.id, text=media_txt, parse_mode=types.ParseMode.HTML)
 
 
 if __name__ == "__main__":
