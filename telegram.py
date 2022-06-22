@@ -4,6 +4,7 @@ import pyodbc
 import pandas as pd
 import pathlib
 
+# id бота
 TOKEN = '5493895594:AAHa3N_cAkS_A3QEi252m0d4m05y3P03TuY'
 DIR_PHOTO = pathlib.Path('//z2/base/ftp/foto')
 SERVER = '192.168.20.5'
@@ -14,8 +15,9 @@ PASSWORD = ''
 MAX_MESSAGE = 50
 
 
-bot = Bot(token=TOKEN)
+bot = Bot(token=TOKEN, parse_mode=types.ParseMode.HTML)
 dp = Dispatcher(bot)
+
 
 # создаем клавиатуру
 # главное меню
@@ -23,6 +25,7 @@ menu_main = types.ReplyKeyboardMarkup(resize_keyboard=True)
 butt_main = ['Новинки']
 for butt in butt_main:
     menu_main.add(butt)
+
 
 # меню новинок
 menu_news = types.ReplyKeyboardMarkup(resize_keyboard=True)
@@ -33,7 +36,7 @@ for butt in butt_news:
 
 # вытягиваем запросом инфу
 def exec_query(where_str):
-    qry = f'select top {MAX_MESSAGE} * from dbo.BOT_NEWS (nolock) where SGI_CODE {where_str}'
+    qry = f'select top {MAX_MESSAGE} * from dbo.BOT_NEWS (nolock) where SGI_CODE {where_str} order by DATE'
     with pyodbc.connect('DRIVER={SQL Server};SERVER=' + SERVER +
                         ';DATABASE=' + DATABASE +
                         ';UID=' + USERNAME +
@@ -88,7 +91,7 @@ async def select_menu_news(message: types.Message):
 
         # если файл фото существет, то прикрепляем его к сообщению
         if photo01.suffix == '.jpg' and photo01.exists():
-            media.attach_photo(photo=types.InputFile(photo01), caption=media_txt, parse_mode=types.ParseMode.HTML)
+            media.attach_photo(photo=types.InputFile(photo01), caption=media_txt)
             if photo02.suffix == '.jpg' and photo02.exists():
                 media.attach_photo(photo=types.InputFile(photo02))
 
@@ -97,7 +100,7 @@ async def select_menu_news(message: types.Message):
             await bot.send_media_group(chat_id=message.chat.id, media=media)
         # если фото нет, то просто текст
         else:
-            await bot.send_message(chat_id=message.chat.id, text=media_txt, parse_mode=types.ParseMode.HTML)
+            await bot.send_message(chat_id=message.chat.id, text=media_txt)
 
 
 if __name__ == "__main__":
