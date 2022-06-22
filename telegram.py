@@ -26,14 +26,14 @@ for butt in butt_main:
 
 # меню новинок
 menu_news = types.ReplyKeyboardMarkup(resize_keyboard=True)
-butt_news = ['Колготки и белье', 'Общий прайс', '<< Назад']
+butt_news = ['Колготки и белье', 'Общий прайс', '<< В главное меню']
 for butt in butt_news:
     menu_news.add(butt)
 
 
 # вытягиваем запросом инфу
 def exec_query(where_str):
-    qry = f'select top {MAX_MESSAGE} * from dbo.BOT (nolock) where SGI_CODE {where_str}'
+    qry = f'select top {MAX_MESSAGE} * from dbo.BOT_NEWS (nolock) where SGI_CODE {where_str}'
     with pyodbc.connect('DRIVER={SQL Server};SERVER=' + SERVER +
                         ';DATABASE=' + DATABASE +
                         ';UID=' + USERNAME +
@@ -43,23 +43,26 @@ def exec_query(where_str):
 
 # команда старт и кнопка назад из новинок в главное меню
 @dp.message_handler(lambda message: message.text in ['/start', butt_news[-1]])
-async def send_message(message: types.Message):
+async def show_menu_main(message: types.Message):
     await message.answer('Что вам показать?', reply_markup=menu_main)
 
 
 # показываем меню новинок
 @dp.message_handler(lambda message: message.text == butt_main[0])
-async def send_message(message: types.Message):
-    await message.answer('Выберите новинки?', reply_markup=menu_news)
+async def show_menu_news(message: types.Message):
+    await message.answer('Выберите новинки:', reply_markup=menu_news)
 
 
 # выбираем что-то из меню новинок
 @dp.message_handler(lambda message: message.text != butt_news[-1])
-async def send_message(message: types.Message):
+async def select_menu_news(message: types.Message):
     if message.text == butt_news[0]:
         arr = exec_query("in ('7', '72', '73', '8')")
     elif message.text == butt_news[1]:
         arr = exec_query("not in ('7', '72', '73', '8')")
+    else:
+        await show_menu_main(message)
+        return True
 
     if len(arr) == 0:
         await bot.send_message(chat_id=message.chat.id, text='Новинок нет')
@@ -76,7 +79,7 @@ async def send_message(message: types.Message):
         # создаем сообщение с двумя фото
         media = types.MediaGroup()
         media_txt = f"{row['MODEL_DESCR'].strip()}" \
-                    f"\n<b>{row['PRICE']:.2f}</b> \u20bd" \
+                    f"\n<b>{row['PRICE']:.2f}</b>\u20bd" \
                     f"\n{row['INGRID'].strip()}" \
                     f"\n{row['COMMENT'].strip()}"
 
