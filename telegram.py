@@ -7,6 +7,8 @@ import pathlib
 # id бота
 # amber_izh_bot
 TOKEN = '5493895594:AAHa3N_cAkS_A3QEi252m0d4m05y3P03TuY'
+# id группы
+CHAT_ID = -1001557785170
 # test_amberbot
 # TOKEN = '5366236312:AAHAjXEjYVIlOVyrkvKBT2awpAaM-Y8xkaQ'
 DIR_PHOTO = pathlib.Path('//z2/base/ftp/foto')
@@ -27,7 +29,7 @@ dp = Dispatcher(bot)
 # создаем клавиатуру
 # главное меню
 menu_main = types.ReplyKeyboardMarkup(resize_keyboard=True)
-butt_main = ['Новинки']
+butt_main = ['Новинки', 'Регистрация']
 for butt in butt_main:
     menu_main.add(butt)
 
@@ -39,7 +41,7 @@ for butt in butt_news:
     menu_news.add(butt)
 
 
-# вытягиваем запросом инфу
+# выполняем запросы
 async def exec_query(qry, mode='select'):
     with pyodbc.connect('DRIVER={SQL Server};SERVER=' + SERVER +
                         ';DATABASE=' + DATABASE +
@@ -52,31 +54,49 @@ async def exec_query(qry, mode='select'):
             return True
 
 
+# проверяем, есть ли подписчик в базе данных
+async def user_exists(id):
+    return len(await exec_query(f'select * from dbo.BOT_USERS where ID = {id}')) != 0
+
+
+# регистрация подписчика
+@dp.message_handler(lambda message: message.text == butt_main[-1])
+async def registration(message: types.Message):
+    # проверяем, что подписчика нет в базе данных
+    if not await user_exists(message.from_user.id):
+        # добавляем подписчика в базу
+        qry = f"insert into dbo.BOT_USERS values (" \
+              f"{message.from_user.id}, " \
+              f"'{message.from_user.full_name}', " \
+              f"'{message.date.strftime('%Y%m%d %H:%M:%S')}')"
+        await exec_query(qry, mode='')
+        await message.answer('Вы зарегистрированы!', reply_markup=menu_main)
+    # уже есть в базе, сообщаем об этом
+    else:
+        await message.answer('Вы уже зарегистрированы!', reply_markup=menu_main)
+
+
 # команда старт и кнопка назад из новинок в главное меню
 @dp.message_handler(lambda message: message.text in ['/start', butt_news[-1]])
 async def show_menu_main(message: types.Message):
-    # добавляем ID подписчика в базу данных
-    if message.text == '/start':
-        # сначала проверяем, что его там нет
-        if len(await exec_query(f'select * from dbo.BOT_USERS where ID = {message.from_user.id}')) == 0:
-            # добавляем подписчика в базу
-            qry = f"insert into dbo.BOT_USERS values (" \
-                  f"{message.from_user.id}, " \
-                  f"'{message.from_user.full_name}', " \
-                  f"'{message.date.strftime('%Y%m%d')}')"
-            await exec_query(qry, mode='')
-    await message.answer('Что вам показать?', reply_markup=menu_main)
+    await message.answer('Выберите:', reply_markup=menu_main)
 
 
 # показываем меню новинок
 @dp.message_handler(lambda message: message.text == butt_main[0])
 async def show_menu_news(message: types.Message):
+    if not await user_exists(message.from_user.id):
+        await message.answer('Вы не зарегистрированы!', reply_markup=menu_main)
+        return True
     await message.answer('Выберите новинки:', reply_markup=menu_news)
 
 
 # выбираем что-то из меню новинок
 @dp.message_handler(lambda message: message.text != butt_news[-1])
 async def select_menu_news(message: types.Message):
+    if not await user_exists(message.from_user.id):
+        await message.answer('Вы не зарегистрированы!', reply_markup=menu_main)
+        return True
     if message.text == butt_news[0]:
         where_str = f"in {SCI_CODE_KOLG}"
     elif message.text == butt_news[1]:
@@ -139,6 +159,13 @@ async def send_info(str_send):
         await bot.send_message(chat_id=row['ID'], text=str_send)
 
 
+# # отправляем известие о новинках
+# @dp.message_handler()
+# # async def send_info(message: types.Message):
+# async def send_info(str_send):
+#     await bot.send_message(CHAT_ID, str_send)
+
+
 # помечаем, что известие отправлено
 async def mark_news(where_str):
     qry = f"update dbo.BOT_NEWS set IS_NEW = 1 where SGI_CODE {where_str}"
@@ -166,6 +193,6 @@ async def scheduled(wait_for):
 if __name__ == "__main__":
     # периодический запуск функции scheduled
     loop = asyncio.get_event_loop()
-    loop.create_task(scheduled(1))
+    loop.create_task(scheduled(60))
     #...периодический
     executor.start_polling(dp, skip_updates=True)
