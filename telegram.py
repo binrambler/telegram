@@ -1,6 +1,6 @@
 from aiogram import Bot, Dispatcher, executor, types
 import asyncio
-import pyodbc
+import sqlalchemy as sa
 import pandas as pd
 import pathlib
 
@@ -8,7 +8,7 @@ import pathlib
 # amber_izh_bot
 TOKEN = '5493895594:AAHa3N_cAkS_A3QEi252m0d4m05y3P03TuY'
 # id группы
-CHAT_ID = -1001557785170
+# CHAT_ID = -1001557785170
 # test_amberbot
 # TOKEN = '5366236312:AAHAjXEjYVIlOVyrkvKBT2awpAaM-Y8xkaQ'
 DIR_PHOTO = pathlib.Path('//z2/base/ftp/foto')
@@ -16,6 +16,7 @@ SERVER = '192.168.20.5'
 DATABASE = 'IZH_SQL_2018'
 USERNAME = 'sa'
 PASSWORD = ''
+DRIVER = 'SQL Server'
 # коды СГИ колготок и белья
 SCI_CODE_KOLG = ('7', '72', '73', '8')
 # максимальное кол-во сообщений
@@ -43,15 +44,12 @@ for butt in butt_news:
 
 # выполняем запросы
 async def exec_query(qry, mode='select'):
-    with pyodbc.connect('DRIVER={SQL Server};SERVER=' + SERVER +
-                        ';DATABASE=' + DATABASE +
-                        ';UID=' + USERNAME +
-                        ';PWD=' + PASSWORD) as conn:
+    engine = sa.create_engine(f'mssql://{USERNAME}:{PASSWORD}@{SERVER}/{DATABASE}?driver={DRIVER}')
+    with engine.connect() as conn:
         if mode == 'select':
             return pd.read_sql(qry, conn)
-        else:
-            conn.execute(qry)
-            return True
+        conn.execute(qry)
+        return True
 
 
 # проверяем, есть ли подписчик в базе данных
@@ -60,7 +58,7 @@ async def user_exists(id):
 
 
 # регистрация подписчика
-@dp.message_handler(lambda message: message.text == butt_main[-1])
+@dp.message_handler(lambda message: message.text == 'Регистрация')
 async def registration(message: types.Message):
     # проверяем, что подписчика нет в базе данных
     if not await user_exists(message.from_user.id):
@@ -77,13 +75,13 @@ async def registration(message: types.Message):
 
 
 # команда старт и кнопка назад из новинок в главное меню
-@dp.message_handler(lambda message: message.text in ['/start', butt_news[-1]])
+@dp.message_handler(lambda message: message.text in ['/start', '<< В главное меню'])
 async def show_menu_main(message: types.Message):
     await message.answer('Выберите:', reply_markup=menu_main)
 
 
 # показываем меню новинок
-@dp.message_handler(lambda message: message.text == butt_main[0])
+@dp.message_handler(lambda message: message.text == 'Новинки')
 async def show_menu_news(message: types.Message):
     if not await user_exists(message.from_user.id):
         await message.answer('Вы не зарегистрированы!', reply_markup=menu_main)
@@ -92,14 +90,14 @@ async def show_menu_news(message: types.Message):
 
 
 # выбираем что-то из меню новинок
-@dp.message_handler(lambda message: message.text != butt_news[-1])
+@dp.message_handler(lambda message: message.text != '<< В главное меню')
 async def select_menu_news(message: types.Message):
     if not await user_exists(message.from_user.id):
         await message.answer('Вы не зарегистрированы!', reply_markup=menu_main)
         return True
-    if message.text == butt_news[0]:
+    if message.text == 'Колготки и белье':
         where_str = f"in {SCI_CODE_KOLG}"
-    elif message.text == butt_news[1]:
+    elif message.text == 'Общий прайс':
         where_str = f"not in {SCI_CODE_KOLG}"
     else:
         await show_menu_main(message)
